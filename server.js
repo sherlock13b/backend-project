@@ -1,6 +1,10 @@
 const express = require('express');
 const cors = require('cors');
 const pool = require('./db');
+const client = require('prom-client');
+const register = new client.Registry();
+client.collectDefaultMetrics({ register });
+
 require('dotenv').config();
 
 const app = express();
@@ -18,6 +22,11 @@ app.get('/notes', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
+});
+
+app.get('/metrics', async (req, res) => {
+  res.set('Content-Type', register.contentType);
+  res.end(await register.metrics());
 });
 
 // Create a note
