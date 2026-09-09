@@ -1,6 +1,6 @@
 const express = require('express');
 const cors = require('cors');
-const pool = require('./db');
+const { initPool, getPool } = require('./db');
 const client = require('prom-client');
 const register = new client.Registry();
 client.collectDefaultMetrics({ register });
@@ -17,7 +17,7 @@ app.get('/health', (req, res) => res.status(200).send('OK'));
 // Get all notes
 app.get('/notes', async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM notes ORDER BY created_at DESC');
+    const result = await getPool().query('SELECT * FROM notes ORDER BY created_at DESC');
     res.json(result.rows);
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -33,7 +33,7 @@ app.get('/metrics', async (req, res) => {
 app.post('/notes', async (req, res) => {
   try {
     const { content } = req.body;
-    const result = await pool.query(
+    const result = await getPool().query(
       'INSERT INTO notes (content) VALUES ($1) RETURNING *',
       [content]
     );
@@ -47,7 +47,7 @@ app.post('/notes', async (req, res) => {
 app.put('/notes/:id', async (req, res) => {
   try {
     const { content } = req.body;
-    const result = await pool.query(
+    const result = await getPool().query(
       'UPDATE notes SET content = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
       [content, req.params.id]
     );
@@ -60,7 +60,7 @@ app.put('/notes/:id', async (req, res) => {
 // Delete a note
 app.delete('/notes/:id', async (req, res) => {
   try {
-    await pool.query('DELETE FROM notes WHERE id = $1', [req.params.id]);
+    await getPool().query('DELETE FROM notes WHERE id = $1', [req.params.id]);
     res.status(204).send();
   } catch (err) {
     res.status(500).json({ error: err.message });
@@ -68,4 +68,9 @@ app.delete('/notes/:id', async (req, res) => {
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+initPool().then(() => {
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}).catch(err => {
+  console.error('Failed to initialize database pool:', err);
+  process.exit(1);
+});
